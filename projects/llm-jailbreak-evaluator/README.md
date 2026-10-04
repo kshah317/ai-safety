@@ -57,9 +57,20 @@ all_three      everything on
 ```
 pip install -r requirements.txt
 python evaluate.py --model mock     # fake offline model, no downloads, instant
-python evaluate.py                  # real run with Qwen/Qwen2.5-0.5B-Instruct on CPU
+python evaluate.py                  # real run with Qwen/Qwen2.5-0.5B-Instruct (uses a GPU if found, else CPU)
 python -m unittest tests.py -v      # tests (use the mock, no downloads)
 ```
+
+If you don't have a GPU, a free Google Colab T4 works nicely. In a notebook, switch the runtime to a T4 GPU (Runtime, then Change runtime type), then run:
+
+```
+!git clone https://github.com/kshah317/ai-safety
+!pip install -q transformers
+%cd ai-safety/projects/llm-jailbreak-evaluator
+!python evaluate.py
+```
+
+Colab already ships with PyTorch, so that's all it needs. The script prints which device it picked when it loads the model. Bigger models (say `--model Qwen/Qwen2.5-1.5B-Instruct`) fit on a T4 too and tend to make the comparison more interesting.
 
 Results land in `results/results.md` and `results/results.csv`. The CSV only keeps labels and the first 80 characters of each reply, never full answers.
 
