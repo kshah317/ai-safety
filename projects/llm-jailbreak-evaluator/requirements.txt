@@ -1,0 +1,3 @@
+# only needed for the real model run; the mock demo and tests use the standard library
+transformers
+torch
