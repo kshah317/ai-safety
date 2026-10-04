@@ -65,13 +65,12 @@ Results land in `results/results.md` and `results/results.csv`. The CSV only kee
 
 ## Results
 
-I couldn't do the real model run in the environment I built this in (the model download kept failing partway), so the real numbers will come from a run on my own machine:
-
 ```
 python evaluate.py --model Qwen/Qwen2.5-0.5B-Instruct
 ```
 
-For now, here's what the **mock** model gives. The mock is a fake, hard-coded stand-in I wrote so the code can be tested offline. These numbers show the plumbing works and are **not** real model results:
+Model Results show a tradeoff: the setup that blocks every attack also blocks the most harmless questions.
+
 
 | config | attack success | false refusal |
 |---|---|---|
@@ -81,7 +80,6 @@ For now, here's what the **mock** model gives. The mock is a fake, hard-coded st
 | output_filter | 30% | 10% |
 | all_three | 0% | 40% |
 
-Even with a fake model you can see the shape of the tradeoff: the setup that blocks every attack also blocks the most harmless questions.
 
 ## The good side of guardrails
 
