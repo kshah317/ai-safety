@@ -1,7 +1,8 @@
 """
 model backends. every backend exposes .generate(system_prompt, user_prompt) -> str.
 
-- HuggingFaceModel: a real small instruct model run locally on cpu via transformers.
+- HuggingFaceModel: a real small instruct model run via transformers, on a gpu (like a
+  colab t4) when one is available, otherwise on cpu.
 - MockModel: a deterministic fake for tests and offline demos (no downloads).
   mock results are only for checking the plumbing, never real model behavior.
 """
@@ -22,8 +23,22 @@ class HuggingFaceModel:
 
         self.torch = torch
         self.max_new_tokens = max_new_tokens
+
+        # use the gpu when there is one, since generation is far faster there
+        if torch.cuda.is_available():
+            self.device = "cuda"
+            # half precision halves memory use and is fast on a t4 (which has no bfloat16 support)
+            dtype = torch.float16
+        else:
+            self.device = "cpu"
+            # cpus are happiest with full precision
+            dtype = torch.float32
+        print(f"loading {model_name} on {self.device} ({dtype})")
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=dtype)
+        # move the weights onto the chosen device before generating anything
+        self.model.to(self.device)
         self.model.eval()
 
     def generate(self, system_prompt, user_prompt):
@@ -35,6 +50,8 @@ class HuggingFaceModel:
         input_ids = self.tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt"
         )
+        # inputs must live on the same device as the model weights
+        input_ids = input_ids.to(self.device)
         # no gradients needed for inference, which saves memory and time
         with self.torch.no_grad():
             output_ids = self.model.generate(
