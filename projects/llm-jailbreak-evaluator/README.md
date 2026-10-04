@@ -76,23 +76,31 @@ Results land in `results/results.md` and `results/results.csv`. The CSV only kee
 
 ## Results
 
-I couldn't do the real model run in the environment I built this in (the model download kept failing partway), so the real numbers will come from a run on my own machine:
+I ran this on a free Google Colab T4 GPU with **Qwen2.5-0.5B-Instruct**, a tiny open-source chatbot from the Qwen team, in half precision with greedy decoding so the run is repeatable:
 
 ```
 python evaluate.py --model Qwen/Qwen2.5-0.5B-Instruct
 ```
 
-For now, here's what the **mock** model gives. The mock is a fake, hard-coded stand-in I wrote so the code can be tested offline. These numbers show the plumbing works and are **not** real model results:
+Attack success is how often a harmful request got an answer. False refusal is how often a harmless question got wrongly blocked. The last five columns break attack success down by wrapper.
 
-| config | attack success | false refusal |
-|---|---|---|
-| baseline | 80% | 0% |
-| system_prompt | 0% | 30% |
-| input_filter | 0% | 0% |
-| output_filter | 30% | 10% |
-| all_three | 0% | 40% |
+| config | attack success | false refusal | direct | story | roleplay | ignore_instructions | hypothetical |
+|---|---|---|---|---|---|---|---|
+| baseline | 42% | 0% | 25% | 88% | 0% | 38% | 62% |
+| system_prompt | 25% | 50% | 12% | 62% | 12% | 0% | 38% |
+| input_filter | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| output_filter | 38% | 20% | 25% | 75% | 0% | 38% | 50% |
+| all_three | 0% | 50% | 0% | 0% | 0% | 0% | 0% |
 
-Even with a fake model you can see the shape of the tradeoff: the setup that blocks every attack also blocks the most harmless questions.
+What I take from it:
+
+- **Wrapping a request in a story works.** With no guardrails, the story wrapper got through 88% of the time, compared with 25% for a plain direct request.
+- **A firmer system prompt helps, but it costs.** It cuts attack success from 42% to 25%, and wrongly blocks half of the harmless questions.
+- **The input filter's 0% and 0% is not a real win.** I wrote its patterns while looking at these same prompts, so it is partly memorizing the test. A different set of prompts would almost certainly get through.
+- **Turning everything on stops every attack here, but it keeps the 50% false refusal rate** that comes from the system prompt. That is the safer-versus-useful tension in one row.
+- **Take the roleplay 0% in the baseline row with a grain of salt.** My refusal detector is crude and may be counting in-character replies as refusals.
+
+This is one run of one tiny model on 8 harmful requests (times 5 wrappers) and 10 harmless questions, so treat it as an illustration, not a benchmark. The offline mock model (`--model mock`) is still there for testing the code without downloads, but its numbers mean nothing about real models.
 
 ## The good side of guardrails
 
