@@ -46,23 +46,24 @@ class HuggingFaceModel:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        # the chat template formats the turns the way this model was trained on
-        input_ids = self.tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt"
+        # the chat template formats the turns the way this model was trained on;
+        # asking for plain text first works the same across transformers versions
+        prompt_text = self.tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, tokenize=False
         )
-        # inputs must live on the same device as the model weights
-        input_ids = input_ids.to(self.device)
+        # turn the text into token ids plus an attention mask, on the same device as the weights
+        inputs = self.tokenizer(prompt_text, return_tensors="pt").to(self.device)
+        prompt_length = inputs["input_ids"].shape[1]
         # no gradients needed for inference, which saves memory and time
         with self.torch.no_grad():
             output_ids = self.model.generate(
-                input_ids,
-                attention_mask=self.torch.ones_like(input_ids),
+                **inputs,
                 max_new_tokens=self.max_new_tokens,
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
         # keep only the newly generated tokens, not the echoed prompt
-        new_tokens = output_ids[0][input_ids.shape[1]:]
+        new_tokens = output_ids[0][prompt_length:]
         return self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
