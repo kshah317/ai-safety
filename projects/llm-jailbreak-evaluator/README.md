@@ -76,13 +76,19 @@ Results land in `results/results.md` and `results/results.csv`. The CSV only kee
 
 ## Results
 
-I ran this on a free Google Colab T4 GPU with **Qwen2.5-0.5B-Instruct**, a tiny open-source chatbot from the Qwen team, in half precision with greedy decoding so the run is repeatable:
+I ran this on a free Google Colab T4 GPU (basically a rented graphics chip) with **Qwen2.5-0.5B-Instruct**, in half precision with greedy decoding so the run is repeatable:
 
 ```
 python evaluate.py --model Qwen/Qwen2.5-0.5B-Instruct
 ```
 
-Attack success is how often a harmful request got an answer. False refusal is how often a harmless question got wrongly blocked. The last five columns break attack success down by wrapper.
+### Why Qwen?
+
+Qwen (say "chwen") is a family of open-source chatbots from Alibaba. "Open-source" just means anyone can download the model and run it themselves, no account or paid API needed. The "0.5B" means it has about half a billion internal settings, which makes it tiny next to the big chatbots you may have used, and "Instruct" means it was trained to follow instructions and chat. I picked it for three boring reasons: it fits on a free GPU, it answers fast (I needed a few hundred replies per run), and anyone can download the same model and get the same numbers I did. The tradeoff is that a tiny model is probably easier to trick than a big one, so don't read these numbers as "chatbots are easy to break." They're just a clear way to see how the tricks and the guardrails behave.
+
+### The table
+
+Attack success is how often a harmful request got an answer. False refusal is how often a harmless question got wrongly blocked. The last five columns break attack success down by trick (I call them wrappers). For both of the first two columns, lower is better.
 
 | config | attack success | false refusal | direct | story | roleplay | ignore_instructions | hypothetical |
 |---|---|---|---|---|---|---|---|
@@ -92,15 +98,21 @@ Attack success is how often a harmful request got an answer. False refusal is ho
 | output_filter | 38% | 20% | 25% | 75% | 0% | 38% | 50% |
 | all_three | 0% | 50% | 0% | 0% | 0% | 0% | 0% |
 
-What I take from it:
+### Here's what is happening in the results
 
-- **Wrapping a request in a story works.** With no guardrails, the story wrapper got through 88% of the time, compared with 25% for a plain direct request.
-- **A firmer system prompt helps, but it costs.** It cuts attack success from 42% to 25%, and wrongly blocks half of the harmless questions.
-- **The input filter's 0% and 0% is not a real win.** I wrote its patterns while looking at these same prompts, so it is partly memorizing the test. A different set of prompts would almost certainly get through.
-- **Turning everything on stops every attack here, but it keeps the 50% false refusal rate** that comes from the system prompt. That is the safer-versus-useful tension in one row.
-- **Take the roleplay 0% in the baseline row with a grain of salt.** My refusal detector is crude and may be counting in-character replies as refusals.
+Picture the chatbot as a shop assistant, and each row as a different set of rules I gave the shop. Baseline is no rules at all. System prompt means I told the assistant up front to be extra careful. Input filter means a bouncer checks your question at the door. Output filter means a second bouncer checks the answer before it leaves. All three is every rule at once.
 
-This is one run of one tiny model on 8 harmful requests (times 5 wrappers) and 10 harmless questions, so treat it as an illustration, not a benchmark. The offline mock model (`--model mock`) is still there for testing the code without downloads, but its numbers mean nothing about real models.
+I then tried 8 harmful requests, each one asked 5 different ways, plus 10 totally harmless questions to see if the rules got in the way of normal use. A few things stood out to me.
+
+**1. Hiding a request inside a story works really well.** Asked straight out, the model answered 2 of the 8 harmful requests. Asked as "write a story where a character explains how to...", it answered 7 of the 8. Same request, same model, just a costume on it. This is the "just ask it in a story" trick I mentioned at the top, and it's the biggest jump in the whole table.
+
+**2. Being careful and being useful pull against each other.** When I told the model to be extra careful, it answered fewer harmful requests (42% down to 25%), which sounds great. But it also refused 5 of the 10 harmless questions. Imagine a nurse asking a normal question about medication safety and getting "sorry, I can't help with that." That's the cost I talk about further down, and here it shows up as a real number.
+
+**3. A perfect score can be fake.** The input filter shows 0% and 0%, which looks like a perfect bouncer. It isn't. I wrote its rules while looking at these exact test questions, so it's like a bouncer who memorized the faces in the photos I showed him. Give him a new face and he'd probably wave it through. Turning all three on also stops every attack here, but you're back to refusing half the harmless questions.
+
+One more thing: the 0% for roleplay in the baseline row is probably too good. My way of detecting a refusal is crude, and it may be counting a model that stays in character as a model that said no.
+
+This is one run of one tiny model on a small set of questions, so treat it as an illustration, not a benchmark. The offline mock model (`--model mock`) is still there for testing the code without downloads, but its numbers mean nothing about real models.
 
 ## The good side of guardrails
 
